@@ -18,7 +18,9 @@ public class MainChatFrame extends JFrame {
     private String username;
 
     // UI Components
-    private JTextArea chatArea;
+    //private JTextArea chatArea;
+    private JPanel chatPanel;
+    private JScrollPane chatScrollPane;
     private JTextField messageField;
     private JButton sendButton;
     private DefaultListModel<String> userListModel;
@@ -122,14 +124,15 @@ public class MainChatFrame extends JFrame {
         rightPanel.add(chatHeader, BorderLayout.NORTH);
 
         // Chat area
-        chatArea = new JTextArea();
-        chatArea.setEditable(false);
-        chatArea.setFont(new Font("Arial", Font.PLAIN, 14));
-        chatArea.setLineWrap(true);
-        chatArea.setWrapStyleWord(true);
-        chatArea.setMargin(new Insets(10, 10, 10, 10));
+        chatPanel = new JPanel();
+        chatPanel.setLayout(new BoxLayout(chatPanel, BoxLayout.Y_AXIS));
+        chatPanel.setBackground(new Color(230, 240, 250));
+        chatPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        JScrollPane chatScrollPane = new JScrollPane(chatArea);
+        chatScrollPane = new JScrollPane(chatPanel);
+        chatScrollPane.setBorder(null);
+        chatScrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        rightPanel.add(chatScrollPane, BorderLayout.CENTER);
         chatScrollPane.setBorder(null);
         rightPanel.add(chatScrollPane, BorderLayout.CENTER);
 
@@ -197,20 +200,32 @@ public class MainChatFrame extends JFrame {
         client.setNewMessageCallback(msg -> {
             SwingUtilities.invokeLater(() -> {
                 String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
-                String displayName = msg.sender.equals(username) ? "You" : msg.sender;
+                boolean isOwn = msg.sender.equals(username);
 
-                chatArea.append(String.format("[%s, %s]\n%s\n\n", displayName, time, msg.content));
-                chatArea.setCaretPosition(chatArea.getDocument().getLength());
+                // ✅ DÙNG MESSAGE BUBBLE
+                MessageBubblePanel bubble = new MessageBubblePanel(
+                        msg.sender,
+                        msg.content,
+                        time,
+                        isOwn
+                );
 
-                // them notification neu tin nhan khong phai cua minh
-                if (!msg.sender.equals(username)) {
-                    // kiem tra neu window khong focus -> show notification
-                    if (!this.isFocused()) {
-                        String preview = msg.content.length() > 50
-                                ? msg.content.substring(0, 50) + "..."
-                                : msg.content;
-                        NotificationUtil.showNotification(msg.sender, preview, this);
-                    }
+                chatPanel.add(bubble);
+                chatPanel.revalidate();
+                chatPanel.repaint();
+
+                // Scroll to bottom
+                SwingUtilities.invokeLater(() -> {
+                    JScrollBar vertical = chatScrollPane.getVerticalScrollBar();
+                    vertical.setValue(vertical.getMaximum());
+                });
+
+                // Notification
+                if (!isOwn && !this.isFocused()) {
+                    String preview = msg.content.length() > 50
+                            ? msg.content.substring(0, 50) + "..."
+                            : msg.content;
+                    NotificationUtil.showNotification(msg.sender, preview, this);
                 }
             });
         });
@@ -218,20 +233,32 @@ public class MainChatFrame extends JFrame {
         // User joined callback
         client.setUserJoinedCallback(user -> {
             SwingUtilities.invokeLater(() -> {
-                chatArea.append(String.format("👋 %s joined the chat\n\n", user));
-                chatArea.setCaretPosition(chatArea.getDocument().getLength());
+                JLabel notifLabel = new JLabel("👋 " + user + " joined the chat");
+                notifLabel.setFont(new Font("Arial", Font.ITALIC, 12));
+                notifLabel.setForeground(Color.GRAY);
+                notifLabel.setBorder(new EmptyBorder(5, 10, 5, 10));
+
+                chatPanel.add(notifLabel);
+                chatPanel.revalidate();
+                chatPanel.repaint();
             });
         });
 
         // User left callback
         client.setUserLeftCallback(user -> {
             SwingUtilities.invokeLater(() -> {
-                chatArea.append(String.format("👋 %s left the chat\n\n", user));
-                chatArea.setCaretPosition(chatArea.getDocument().getLength());
+                JLabel notifLabel = new JLabel("👋 " + user + " left the chat");
+                notifLabel.setFont(new Font("Arial", Font.ITALIC, 12));
+                notifLabel.setForeground(Color.GRAY);
+                notifLabel.setBorder(new EmptyBorder(5, 10, 5, 10));
+
+                chatPanel.add(notifLabel);
+                chatPanel.revalidate();
+                chatPanel.repaint();
             });
         });
 
-        // Online users callback
+        // Online users callback (giữ nguyên)
         client.setOnlineUsersCallback(users -> {
             SwingUtilities.invokeLater(() -> {
                 userListModel.clear();
