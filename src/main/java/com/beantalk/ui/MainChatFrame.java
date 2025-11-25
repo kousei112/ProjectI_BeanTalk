@@ -146,6 +146,19 @@ public class MainChatFrame extends JFrame {
         ));
         messageField.addActionListener(e -> sendMessage());
 
+        // them emoji button
+        JButton emojiButton = new JButton("😊");
+        emojiButton.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 20));
+        emojiButton.setBackground(Color.WHITE);
+        emojiButton.setFocusPainted(false);
+        emojiButton.setBorder(new EmptyBorder(10, 15, 10, 15));
+        emojiButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        emojiButton.setToolTipText("Choose Emoji");
+        emojiButton.addActionListener(e -> {
+            EmojiPicker picker = new EmojiPicker(this, messageField);
+            picker.setVisible(true);
+        });
+
         sendButton = new JButton("Send");
         sendButton.setFont(new Font("Arial", Font.BOLD, 14));
         sendButton.setBackground(new Color(25, 118, 210));
@@ -154,6 +167,12 @@ public class MainChatFrame extends JFrame {
         sendButton.setBorder(new EmptyBorder(10, 30, 10, 30));
         sendButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
         sendButton.addActionListener(e -> sendMessage());
+
+        // panel cho emoji + send button
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
+        buttonPanel.setBackground(Color.WHITE);
+        buttonPanel.add(emojiButton);
+        buttonPanel.add(sendButton);
 
         inputPanel.add(messageField, BorderLayout.CENTER);
         inputPanel.add(sendButton, BorderLayout.EAST);
