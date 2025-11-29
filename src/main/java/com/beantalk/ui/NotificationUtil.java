@@ -27,7 +27,7 @@ public class NotificationUtil {
             ));
 
             // Icon
-            JLabel iconLabel = new JLabel("💬");
+            JLabel iconLabel = new JLabel("");
             iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 32));
             panel.add(iconLabel, BorderLayout.WEST);
 

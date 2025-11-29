@@ -9,6 +9,8 @@ import java.awt.event.*;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.io.InputStream;
+
 
 /**
  * Main Chat Frame
@@ -19,6 +21,7 @@ public class MainChatFrame extends JFrame {
 
     // UI Components
     //private JTextArea chatArea;
+    private  JPanel welcomePanel;
     private JPanel chatPanel;
     private JScrollPane chatScrollPane;
     private JTextField messageField;
@@ -28,7 +31,7 @@ public class MainChatFrame extends JFrame {
     private JLabel onlineCountLabel;
     private JLabel chatWithLabel;
 
-    private String currentReceiver = "ALL";
+    private String currentReceiver = null;
 
     public MainChatFrame(ChatClient client) {
         this.client = client;
@@ -80,7 +83,15 @@ public class MainChatFrame extends JFrame {
                 String selectedUser = userList.getSelectedValue();
                 if (selectedUser != null && !selectedUser.equals(username)) {
                     currentReceiver = selectedUser;
-                    chatWithLabel.setText("💬 Chat with: " + selectedUser);
+                    chatWithLabel.setText("Chat with: " + selectedUser);
+
+                    // chuyen tu welcome sang chat
+                    welcomePanel.setVisible(false);
+                    chatPanel.setVisible(true);
+
+                    // refresh container
+                    chatScrollPane.revalidate();
+                    chatScrollPane.repaint();
                 }
             }
         });
@@ -89,21 +100,12 @@ public class MainChatFrame extends JFrame {
         userScrollPane.setBorder(null);
         leftPanel.add(userScrollPane, BorderLayout.CENTER);
 
-        // Broadcast button
-        JButton broadcastButton = new JButton("📢 Broadcast to ALL");
-        broadcastButton.setFont(new Font("Arial", Font.BOLD, 12));
-        broadcastButton.setBackground(new Color(76, 175, 80));
-        broadcastButton.setForeground(Color.WHITE);
-        broadcastButton.setFocusPainted(false);
-        broadcastButton.setBorder(new EmptyBorder(10, 10, 10, 10));
-        broadcastButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        broadcastButton.addActionListener(e -> {
-            currentReceiver = "ALL";
-            chatWithLabel.setText("💬 Chat with: ALL");
-            userList.clearSelection();
-        });
-
-        leftPanel.add(broadcastButton, BorderLayout.SOUTH);
+        // Footer cho left panel
+        JLabel footerLabel = new JLabel("BeanTalk v1.0", SwingConstants.CENTER);
+        footerLabel.setFont(new Font("Arial", Font.ITALIC, 10));
+        footerLabel.setForeground(Color.GRAY);
+        footerLabel.setBorder(new EmptyBorder(5, 5, 5, 5));
+        leftPanel.add(footerLabel, BorderLayout.SOUTH);
 
         mainPanel.add(leftPanel, BorderLayout.WEST);
 
@@ -116,25 +118,34 @@ public class MainChatFrame extends JFrame {
         chatHeader.setBackground(new Color(33, 150, 243));
         chatHeader.setBorder(new EmptyBorder(10, 15, 10, 15));
 
-        chatWithLabel = new JLabel("💬 Chat with: ALL");
+        chatWithLabel = new JLabel(" Chat with: ALL");
         chatWithLabel.setFont(new Font("Arial", Font.BOLD, 16));
         chatWithLabel.setForeground(Color.WHITE);
         chatHeader.add(chatWithLabel, BorderLayout.CENTER);
 
         rightPanel.add(chatHeader, BorderLayout.NORTH);
 
-        // Chat area
+        // welcom panel
+        welcomePanel = createWelcomePanel();
+
+        // chat panel (an ban dau)
         chatPanel = new JPanel();
         chatPanel.setLayout(new BoxLayout(chatPanel, BoxLayout.Y_AXIS));
         chatPanel.setBackground(new Color(230, 240, 250));
         chatPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
+        chatPanel.setVisible(false);
 
-        chatScrollPane = new JScrollPane(chatPanel);
+        //  container switch welcome va chat
+        JPanel chatContainer = new JPanel(new CardLayout());
+        chatContainer.add(welcomePanel, "WELCOME");
+        chatContainer.add(chatPanel, "CHAT");
+
+        chatScrollPane = new JScrollPane(chatContainer);
         chatScrollPane.setBorder(null);
         chatScrollPane.getVerticalScrollBar().setUnitIncrement(16);
         rightPanel.add(chatScrollPane, BorderLayout.CENTER);
-        chatScrollPane.setBorder(null);
-        rightPanel.add(chatScrollPane, BorderLayout.CENTER);
+
+
 
         // Message input panel
         JPanel inputPanel = new JPanel(new BorderLayout(10, 0));
@@ -177,8 +188,9 @@ public class MainChatFrame extends JFrame {
         buttonPanel.add(emojiButton);
         buttonPanel.add(sendButton);
 
+        // sendButton
         inputPanel.add(messageField, BorderLayout.CENTER);
-        inputPanel.add(sendButton, BorderLayout.EAST);
+        inputPanel.add(buttonPanel, BorderLayout.EAST);
 
         rightPanel.add(inputPanel, BorderLayout.SOUTH);
 
@@ -193,6 +205,60 @@ public class MainChatFrame extends JFrame {
                 client.disconnect();
             }
         });
+    }
+
+    // Tao welcome panel voi anh
+    private JPanel createWelcomePanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBackground(new Color(230, 240, 250));
+        panel.setBorder(new EmptyBorder(50, 50, 50, 50));
+
+        // load anh
+        try {
+            // doc anh tu resources
+            InputStream imgStream = getClass().getResourceAsStream("/images/logo.png");
+            if (imgStream != null) {
+                ImageIcon originalIcon = new ImageIcon(javax.imageio.ImageIO.read(imgStream));
+
+                // Scale anh
+                Image scaledImage = originalIcon.getImage().getScaledInstance(353, 121, Image.SCALE_SMOOTH);
+                JLabel imageLabel = new JLabel(new ImageIcon(scaledImage));
+                imageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+                panel.add(Box.createVerticalGlue());
+                panel.add(imageLabel);
+                panel.add(Box.createVerticalStrut(20));
+            }
+        } catch (Exception e) {
+            System.err.println("Cannot load welcome image: " + e.getMessage());
+
+            // Fallback: Hiển thị emoji nếu không load được ảnh
+            JLabel iconLabel = new JLabel("💬", SwingConstants.CENTER);
+            iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 80));
+            iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+            panel.add(Box.createVerticalGlue());
+            panel.add(iconLabel);
+            panel.add(Box.createVerticalStrut(20));
+        }
+
+        // Welcome text
+        JLabel welcomeLabel = new JLabel("Welcome to BeanTalk!", SwingConstants.CENTER);
+        welcomeLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        welcomeLabel.setForeground(new Color(25, 118, 210));
+        welcomeLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel subtitleLabel = new JLabel("Select a user to start chatting", SwingConstants.CENTER);
+        subtitleLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+        subtitleLabel.setForeground(Color.GRAY);
+        subtitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        panel.add(welcomeLabel);
+        panel.add(Box.createVerticalStrut(10));
+        panel.add(subtitleLabel);
+        panel.add(Box.createVerticalGlue());
+
+        return panel;
     }
 
     private void setupCallbacks() {
@@ -233,7 +299,7 @@ public class MainChatFrame extends JFrame {
         // User joined callback
         client.setUserJoinedCallback(user -> {
             SwingUtilities.invokeLater(() -> {
-                JLabel notifLabel = new JLabel("👋 " + user + " joined the chat");
+                JLabel notifLabel = new JLabel(" " + user + " joined the chat");
                 notifLabel.setFont(new Font("Arial", Font.ITALIC, 12));
                 notifLabel.setForeground(Color.GRAY);
                 notifLabel.setBorder(new EmptyBorder(5, 10, 5, 10));
@@ -247,7 +313,7 @@ public class MainChatFrame extends JFrame {
         // User left callback
         client.setUserLeftCallback(user -> {
             SwingUtilities.invokeLater(() -> {
-                JLabel notifLabel = new JLabel("👋 " + user + " left the chat");
+                JLabel notifLabel = new JLabel(" " + user + " left the chat");
                 notifLabel.setFont(new Font("Arial", Font.ITALIC, 12));
                 notifLabel.setForeground(Color.GRAY);
                 notifLabel.setBorder(new EmptyBorder(5, 10, 5, 10));
@@ -258,14 +324,14 @@ public class MainChatFrame extends JFrame {
             });
         });
 
-        // Online users callback (giữ nguyên)
+        // Online users callback
         client.setOnlineUsersCallback(users -> {
             SwingUtilities.invokeLater(() -> {
                 userListModel.clear();
                 for (String user : users) {
                     userListModel.addElement(user);
                 }
-                onlineCountLabel.setText(String.format("👥 Online (%d)", users.size()));
+                onlineCountLabel.setText(String.format(" Online (%d)", users.size()));
             });
         });
     }
@@ -274,6 +340,17 @@ public class MainChatFrame extends JFrame {
         String message = messageField.getText().trim();
 
         if (message.isEmpty()) {
+            return;
+        }
+
+        // phai chon user truoc
+        if (currentReceiver == null) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Please select a user to chat with!",
+                    "No User Selected",
+                    JOptionPane.WARNING_MESSAGE
+            );
             return;
         }
 
@@ -293,10 +370,10 @@ public class MainChatFrame extends JFrame {
 
             String user = (String) value;
             if (user.equals(username)) {
-                label.setText("👤 " + user + " (You)");
+                label.setText(" " + user + " (You)");
                 label.setFont(new Font("Arial", Font.BOLD, 14));
             } else {
-                label.setText("🟢 " + user);
+                label.setText(" " + user);
                 label.setFont(new Font("Arial", Font.PLAIN, 14));
             }
 

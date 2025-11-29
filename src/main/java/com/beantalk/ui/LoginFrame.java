@@ -39,7 +39,7 @@ public class LoginFrame extends JFrame {
         mainPanel.setBackground(new Color(240, 248, 255));
 
         // Title
-        JLabel titleLabel = new JLabel("🌟 BEANTALK CHAT", SwingConstants.CENTER);
+        JLabel titleLabel = new JLabel("BEANTALK CHAT", SwingConstants.CENTER);
         titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
         titleLabel.setForeground(new Color(25, 118, 210));
         mainPanel.add(titleLabel, BorderLayout.NORTH);
