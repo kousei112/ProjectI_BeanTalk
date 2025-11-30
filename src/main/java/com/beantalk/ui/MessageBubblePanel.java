@@ -29,12 +29,15 @@ public class MessageBubblePanel extends JPanel{
         // main bubble panel
         JPanel bubblePanel = new JPanel();
         bubblePanel.setLayout(new BoxLayout(bubblePanel, BoxLayout.Y_AXIS));
-        bubblePanel.setBorder(new EmptyBorder(5, 10, 5, 10));
+        bubblePanel.setBorder(BorderFactory.createCompoundBorder(
+                new EmptyBorder(5, 10, 5, 10),
+                BorderFactory.createLineBorder(new Color(0, 0, 0, 50), 1) // them vien
+        ));
 
         if (isOwnMessage) {
-            bubblePanel.setBackground(new Color(220, 248, 198));
+            bubblePanel.setBackground(new Color(220, 248, 198, 230));
         } else {
-            bubblePanel.setBackground(Color.WHITE);
+            bubblePanel.setBackground(new Color(255, 255, 255, 230));
         }
 
         // Sender name (neu khong phai tin nhan cua minh)

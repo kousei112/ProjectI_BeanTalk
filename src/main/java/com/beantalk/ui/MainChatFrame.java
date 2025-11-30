@@ -2,6 +2,7 @@ package com.beantalk.ui;
 
 import com.beantalk.client.ChatClient;
 
+import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -129,14 +130,15 @@ public class MainChatFrame extends JFrame {
         welcomePanel = createWelcomePanel();
 
         // chat panel (an ban dau)
-        chatPanel = new JPanel();
+        chatPanel = createBackgroundPanel("/images/whitegreenwallpaper.jpg");
         chatPanel.setLayout(new BoxLayout(chatPanel, BoxLayout.Y_AXIS));
-        chatPanel.setBackground(new Color(230, 240, 250));
         chatPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
         chatPanel.setVisible(false);
+        chatPanel.setOpaque(false);
 
         //  container switch welcome va chat
         JPanel chatContainer = new JPanel(new CardLayout());
+        chatContainer.setOpaque(false);
         chatContainer.add(welcomePanel, "WELCOME");
         chatContainer.add(chatPanel, "CHAT");
 
@@ -207,50 +209,59 @@ public class MainChatFrame extends JFrame {
         });
     }
 
-    // Tao welcome panel voi anh
+    // Tao welcome panel voi anh nen
     private JPanel createWelcomePanel() {
-        JPanel panel = new JPanel();
+        // ✅ DÙNG PANEL VỚI ẢNH NỀN
+        JPanel panel = createBackgroundPanel("/images/whitegreenwallpaper.jpg");
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(new Color(230, 240, 250));
         panel.setBorder(new EmptyBorder(50, 50, 50, 50));
+        panel.setOpaque(false);  // Để thấy background
 
-        // load anh
+        panel.add(Box.createVerticalGlue());
+
+        // them logo
         try {
-            // doc anh tu resources
-            InputStream imgStream = getClass().getResourceAsStream("/images/logo.png");
-            if (imgStream != null) {
-                ImageIcon originalIcon = new ImageIcon(javax.imageio.ImageIO.read(imgStream));
-
-                // Scale anh
-                Image scaledImage = originalIcon.getImage().getScaledInstance(353, 121, Image.SCALE_SMOOTH);
-                JLabel imageLabel = new JLabel(new ImageIcon(scaledImage));
-                imageLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-
-                panel.add(Box.createVerticalGlue());
-                panel.add(imageLabel);
-                panel.add(Box.createVerticalStrut(20));
+            InputStream logoStream = getClass().getResourceAsStream("/images/logo.png");
+            if (logoStream != null) {
+                Image logoImage = ImageIO.read(logoStream);
+                // scale logo
+                Image scaledLogo = logoImage.getScaledInstance(323, 118, Image.SCALE_SMOOTH);
+                JLabel logoLabel = new JLabel(new ImageIcon(scaledLogo));
+                logoLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+                panel.add(logoLabel);
+            } else {
+                // Fallback: dùng emoji nếu không tìm thấy logo
+                JLabel iconLabel = new JLabel("💬", SwingConstants.CENTER);
+                iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 80));
+                iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+                panel.add(iconLabel);
             }
         } catch (Exception e) {
-            System.err.println("Cannot load welcome image: " + e.getMessage());
-
-            // Fallback: Hiển thị emoji nếu không load được ảnh
+            System.err.println("Error loading logo: " + e.getMessage());
+            // Fallback: dùng emoji
             JLabel iconLabel = new JLabel("💬", SwingConstants.CENTER);
             iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 80));
             iconLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-            panel.add(Box.createVerticalGlue());
             panel.add(iconLabel);
-            panel.add(Box.createVerticalStrut(20));
         }
 
-        // Welcome text
+        panel.add(Box.createVerticalStrut(30));
+
+        // Welcome text với shadow để dễ đọc
         JLabel welcomeLabel = new JLabel("Welcome to BeanTalk!", SwingConstants.CENTER);
-        welcomeLabel.setFont(new Font("Arial", Font.BOLD, 24));
-        welcomeLabel.setForeground(new Color(25, 118, 210));
+        welcomeLabel.setFont(new Font("Arial", Font.BOLD, 32));
+        welcomeLabel.setForeground(Color.WHITE);  // Chữ trắng
         welcomeLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel subtitleLabel = new JLabel("Select a user to start chatting", SwingConstants.CENTER);
+        // Thêm shadow cho text (để dễ đọc trên ảnh nền)
+        welcomeLabel.setBorder(BorderFactory.createCompoundBorder(
+                new EmptyBorder(5, 5, 5, 5),
+                BorderFactory.createLineBorder(new Color(0, 0, 0, 100), 0)
+        ));
+
+        JLabel subtitleLabel = new JLabel("Select a user from the list to start chatting", SwingConstants.CENTER);
         subtitleLabel.setFont(new Font("Arial", Font.PLAIN, 16));
-        subtitleLabel.setForeground(Color.GRAY);
+        subtitleLabel.setForeground(Color.BLACK);  // Chu den
         subtitleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         panel.add(welcomeLabel);
@@ -259,6 +270,33 @@ public class MainChatFrame extends JFrame {
         panel.add(Box.createVerticalGlue());
 
         return panel;
+    }
+
+    private JPanel createBackgroundPanel(String imagePath) {
+        return new JPanel() {
+            private Image backgroundImage;
+
+            {
+                try {
+                    InputStream imgStream = getClass().getResourceAsStream(imagePath);
+                    if (imgStream != null) {
+                        backgroundImage = ImageIO.read(imgStream);
+                        System.out.println("Background loaded: " + imagePath);
+                    } else {
+                        System.err.println("Background not found: " + imagePath);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error loading background: " +  e.getMessage());
+                }
+            }
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                if (backgroundImage != null) {
+                    g.drawImage(backgroundImage, 0, 0, getWidth(), getHeight(), this);
+                }
+            }
+        };
     }
 
     private void setupCallbacks() {
