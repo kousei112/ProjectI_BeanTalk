@@ -130,7 +130,7 @@ public class MainChatFrame extends JFrame {
         welcomePanel = createWelcomePanel();
 
         // chat panel (an ban dau)
-        chatPanel = createBackgroundPanel("/images/whitegreenwallpaper.jpg");
+        chatPanel = createBackgroundPanel("/images/chatwallpaper.jpg");
         chatPanel.setLayout(new BoxLayout(chatPanel, BoxLayout.Y_AXIS));
         chatPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
         chatPanel.setVisible(false);
@@ -212,7 +212,7 @@ public class MainChatFrame extends JFrame {
     // Tao welcome panel voi anh nen
     private JPanel createWelcomePanel() {
         // ✅ DÙNG PANEL VỚI ẢNH NỀN
-        JPanel panel = createBackgroundPanel("/images/whitegreenwallpaper.jpg");
+        JPanel panel = createBackgroundPanel("/images/a.jpg");
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
         panel.setBorder(new EmptyBorder(50, 50, 50, 50));
         panel.setOpaque(false);  // Để thấy background
@@ -250,7 +250,7 @@ public class MainChatFrame extends JFrame {
         // Welcome text với shadow để dễ đọc
         JLabel welcomeLabel = new JLabel("Welcome to BeanTalk!", SwingConstants.CENTER);
         welcomeLabel.setFont(new Font("Arial", Font.BOLD, 32));
-        welcomeLabel.setForeground(Color.WHITE);  // Chữ trắng
+        welcomeLabel.setForeground(Color.BLACK);  // Chu den
         welcomeLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         // Thêm shadow cho text (để dễ đọc trên ảnh nền)
