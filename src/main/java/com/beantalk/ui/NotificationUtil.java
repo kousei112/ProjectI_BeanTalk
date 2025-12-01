@@ -5,14 +5,22 @@ import java.awt.*;
 import java.awt.event.*;
 
 /**
- * Notification Popup Utility
+ * Notification Popup Utility với callback support
  */
 public class NotificationUtil {
 
     /**
-     * Hiển thị notification popup
+     * Hiển thị notification popup (version cũ - tương thích ngược)
      */
     public static void showNotification(String title, String message, JFrame parentFrame) {
+        showNotificationWithCallback(title, message, parentFrame, null);
+    }
+
+    /**
+     * Hiển thị notification popup với callback khi click
+     */
+    public static void showNotificationWithCallback(String title, String message,
+                                                    JFrame parentFrame, Runnable onClickCallback) {
         SwingUtilities.invokeLater(() -> {
             JWindow notification = new JWindow();
             notification.setAlwaysOnTop(true);
@@ -27,8 +35,8 @@ public class NotificationUtil {
             ));
 
             // Icon
-            JLabel iconLabel = new JLabel("");
-            iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 32));
+            JLabel iconLabel = new JLabel("💬");
+            iconLabel.setFont(com.beantalk.util.EmojiFontUtil.getEmojiFont(Font.PLAIN, 32));
             panel.add(iconLabel, BorderLayout.WEST);
 
             // Text panel
@@ -74,16 +82,23 @@ public class NotificationUtil {
             int y = screenSize.height - notification.getHeight() - 50;
             notification.setLocation(x, y);
 
-            // Click để focus vào parent frame
+            // Click để thực hiện callback và focus vào parent frame
             panel.addMouseListener(new MouseAdapter() {
                 @Override
                 public void mouseClicked(MouseEvent e) {
-                    if (parentFrame != null) {
-                        parentFrame.setVisible(true);
-                        parentFrame.toFront();
-                        parentFrame.requestFocus();
-                    }
                     notification.dispose();
+
+                    // Thực hiện callback nếu có
+                    if (onClickCallback != null) {
+                        onClickCallback.run();
+                    } else {
+                        // Behavior mặc định: chỉ focus vào parent frame
+                        if (parentFrame != null) {
+                            parentFrame.setVisible(true);
+                            parentFrame.toFront();
+                            parentFrame.requestFocus();
+                        }
+                    }
                 }
             });
 
@@ -95,6 +110,7 @@ public class NotificationUtil {
                     textPanel.setBackground(new Color(60, 60, 60));
                     closePanel.setBackground(new Color(60, 60, 60));
                     closeButton.setBackground(new Color(60, 60, 60));
+                    panel.setCursor(new Cursor(Cursor.HAND_CURSOR));
                 }
 
                 @Override
@@ -103,6 +119,7 @@ public class NotificationUtil {
                     textPanel.setBackground(new Color(50, 50, 50));
                     closePanel.setBackground(new Color(50, 50, 50));
                     closeButton.setBackground(new Color(50, 50, 50));
+                    panel.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
                 }
             });
 
@@ -142,12 +159,33 @@ public class NotificationUtil {
             testFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             testFrame.setLocationRelativeTo(null);
 
-            JButton testButton = new JButton("Show Notification");
-            testButton.addActionListener(e -> {
+            JButton testButton1 = new JButton("Show Notification (No Callback)");
+            testButton1.addActionListener(e -> {
                 showNotification("Alice", "Hello! This is a test message.", testFrame);
             });
 
-            testFrame.add(testButton);
+            JButton testButton2 = new JButton("Show Notification (With Callback)");
+            testButton2.addActionListener(e -> {
+                showNotificationWithCallback(
+                        "Bob",
+                        "Click me to see the callback!",
+                        testFrame,
+                        () -> {
+                            JOptionPane.showMessageDialog(testFrame,
+                                    "Callback executed! You clicked the notification.",
+                                    "Callback",
+                                    JOptionPane.INFORMATION_MESSAGE);
+                        }
+                );
+            });
+
+            JPanel buttonPanel = new JPanel();
+            buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
+            buttonPanel.add(testButton1);
+            buttonPanel.add(Box.createVerticalStrut(10));
+            buttonPanel.add(testButton2);
+
+            testFrame.add(buttonPanel);
             testFrame.setVisible(true);
         });
     }

@@ -1,12 +1,14 @@
 package com.beantalk.server;
 
+import com.beantalk.util.GroupDAO;
+
 import java.io.*;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
 
 /**
- * Chat Server - Lắng nghe kết nối từ clients
+ * Chat Server - Lắng nghe kết nối từ clients với Group Chat support
  */
 public class ChatServer {
     private static final int PORT = 5555;
@@ -52,16 +54,33 @@ public class ChatServer {
     }
 
     /**
+     * Broadcast message đến tất cả members của group
+     */
+    public static void broadcastToGroup(int groupId, String message, ClientHandler sender) {
+        // Lấy danh sách user IDs trong group
+        List<Integer> memberIds = GroupDAO.getGroupMemberIds(groupId);
+
+        for (ClientHandler client : clientHandlers) {
+            // Gửi cho tất cả members, trừ sender (nếu có)
+            if (client.getUserID() != 0 &&
+                    memberIds.contains(client.getUserID()) &&
+                    client != sender) {
+                client.sendMessage(message);
+            }
+        }
+    }
+
+    /**
      * Gửi message đến 1 client cụ thể
      */
     public static boolean sendToUser(String username, String message) {
         for (ClientHandler client : clientHandlers) {
             if (client.getUsername() != null && client.getUsername().equals(username)) {
                 client.sendMessage(message);
-                return true;  // ← Tìm thấy và gửi thành công
+                return true;
             }
         }
-        return false;  // ← Không tìm thấy user
+        return false;
     }
 
     /**

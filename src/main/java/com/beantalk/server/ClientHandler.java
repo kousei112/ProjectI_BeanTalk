@@ -2,10 +2,13 @@ package com.beantalk.server;
 
 import com.beantalk.model.User;
 import com.beantalk.model.Message;
+import com.beantalk.model.Group;
 import com.beantalk.util.UserDAO;
 import com.beantalk.util.MessageDAO;
+import com.beantalk.util.GroupDAO;
 import com.beantalk.util.SecurityUtil;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import java.io.*;
@@ -13,7 +16,7 @@ import java.net.Socket;
 import java.util.List;
 
 /**
- * ClientHandler - Xử lý từng client connection
+ * ClientHandler - Xử lý từng client connection với Group Chat support
  */
 public class ClientHandler implements Runnable {
     private Socket socket;
@@ -70,6 +73,22 @@ public class ClientHandler implements Runnable {
                     handleSendMessage(json);
                     break;
 
+                case "CREATE_GROUP":
+                    handleCreateGroup(json);
+                    break;
+
+                case "GET_USER_GROUPS":
+                    handleGetUserGroups();
+                    break;
+
+                case "GET_GROUP_MEMBERS":
+                    handleGetGroupMembers(json);
+                    break;
+
+                case "RENAME_GROUP":
+                    handleRenameGroup(json);
+                    break;
+
                 case "GET_ONLINE_USERS":
                     handleGetOnlineUsers();
                     break;
@@ -83,6 +102,7 @@ public class ClientHandler implements Runnable {
             }
         } catch (Exception e) {
             sendError("Invalid message format: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -165,7 +185,7 @@ public class ClientHandler implements Runnable {
     }
 
     /**
-     * Xu li gui tin nhan - luu vao database (encrypted)
+     * Xu li gui tin nhan - private hoặc group
      */
     private void handleSendMessage(JsonObject json) {
         if (this.userID == 0) {
@@ -173,117 +193,238 @@ public class ClientHandler implements Runnable {
             return;
         }
 
-        String receiver = json.get("receiver").getAsString();
         String content = json.get("content").getAsString();
-
-        System.out.println("💬 Message: " + username + " -> " + receiver);
+        Integer groupId = json.has("groupId") ? json.get("groupId").getAsInt() : null;
+        String receiver = json.has("receiver") ? json.get("receiver").getAsString() : null;
 
         // Encrypt message
         String encryptedContent = SecurityUtil.encryptMessage(content);
 
-        // Xác định receiverId
-        Integer receiverId = null;
+        if (groupId != null) {
+            // GROUP MESSAGE
+            handleGroupMessage(groupId, content, encryptedContent);
+        } else if (receiver != null) {
+            // PRIVATE MESSAGE
+            handlePrivateMessage(receiver, content, encryptedContent);
+        } else {
+            sendError("Must specify either receiver or groupId");
+        }
+    }
 
-        if (!receiver.equals("ALL")) {
-            // Private message - phải tìm receiver
-            User receiverUser = UserDAO.getUserByUsername(receiver);
+    /**
+     * Xử lý group message
+     */
+    private void handleGroupMessage(int groupId, String content, String encryptedContent) {
+        System.out.println("💬 Group message: " + username + " -> Group#" + groupId);
 
-            if (receiverUser == null) {
-                // User không tồn tại
-                sendError("User not found: " + receiver);
-                System.out.println("❌ User not found: " + receiver);
-                return; // RETURN NGAY - không lưu vào DB
-            }
-
-            receiverId = receiverUser.getUserID();
+        // Kiểm tra user có phải member không
+        if (!GroupDAO.isMember(groupId, this.userID)) {
+            sendError("You are not a member of this group");
+            return;
         }
 
         // Lưu vào database
-        try {
-            boolean saved = MessageDAO.saveMessage(
-                    this.userID,
-                    receiverId,  // null nếu broadcast, có giá trị nếu private
-                    null,        // group_id
-                    encryptedContent,
-                    "TEXT",
-                    null         // file_path
-            );
+        boolean saved = MessageDAO.saveMessage(
+                this.userID,
+                null,  // receiver_id = null for group
+                groupId,
+                encryptedContent,
+                "TEXT",
+                null
+        );
 
-            if (saved) {
-                System.out.println("💾 Message saved (encrypted)");
-            } else {
-                System.err.println("❌ Failed to save message");
-            }
-        } catch (Exception e) {
-            System.err.println("❌ Error saving message: " + e.getMessage());
-            e.printStackTrace();
+        if (saved) {
+            System.out.println("💾 Group message saved");
         }
 
-        // Gửi message đến receiver
+        // Tạo message object
+        JsonObject message = new JsonObject();
+        message.addProperty("type", "NEW_MESSAGE");
+        message.addProperty("sender", this.username);
+        message.addProperty("content", content);
+        message.addProperty("groupId", groupId);
+
+        // GỬI CHO CHÍNH SENDER (quan trọng!)
+        sendMessage(message.toString());
+
+        // Gửi đến tất cả members khác của group
+        ChatServer.broadcastToGroup(groupId, message.toString(), this);
+        System.out.println("📤 Group broadcast: " + username + " -> Group#" + groupId);
+    }
+
+    /**
+     * Xử lý private message
+     */
+    private void handlePrivateMessage(String receiver, String content, String encryptedContent) {
+        System.out.println("💬 Private message: " + username + " -> " + receiver);
+
+        // Tìm receiver
+        User receiverUser = UserDAO.getUserByUsername(receiver);
+
+        if (receiverUser == null) {
+            sendError("User not found: " + receiver);
+            return;
+        }
+
+        // Lưu vào database
+        boolean saved = MessageDAO.saveMessage(
+                this.userID,
+                receiverUser.getUserID(),
+                null,  // group_id = null for private
+                encryptedContent,
+                "TEXT",
+                null
+        );
+
+        if (saved) {
+            System.out.println("💾 Private message saved");
+        }
+
+        // Tạo message
         JsonObject message = new JsonObject();
         message.addProperty("type", "NEW_MESSAGE");
         message.addProperty("sender", this.username);
         message.addProperty("receiver", receiver);
         message.addProperty("content", content);
 
-        if (receiver.equals("ALL")) {
-            // Broadcast
-            ChatServer.broadcast(message.toString(), this);
-            System.out.println("📤 Broadcast: " + username + " -> ALL");
+        // GỬI LẠI CHO SENDER (để hiển thị tin nhắn của chính mình)
+        sendMessage(message.toString());
+        System.out.println("📤 Sent back to sender: " + username);
+
+        // Gửi cho receiver
+        boolean sent = ChatServer.sendToUser(receiver, message.toString());
+        if (sent) {
+            System.out.println("📤 Private: " + username + " -> " + receiver);
         } else {
-            // Private message
-            boolean sent = ChatServer.sendToUser(receiver, message.toString());
-            if (sent) {
-                // Confirm gửi lại cho sender
-                sendMessage(message.toString());
-                System.out.println("📤 Private: " + username + " -> " + receiver);
-            } else {
-                sendError("User " + receiver + " is not online");
-                System.out.println("❌ User offline: " + receiver);
-            }
+            System.out.println("❌ User offline: " + receiver);
+            // Vẫn đã lưu vào DB, khi user online sẽ load history
         }
     }
 
     /**
-     * Load lich su doan chat tu database
+     * Tạo group mới
      */
-    private void handleLoadHistory(JsonObject json) {
+    private void handleCreateGroup(JsonObject json) {
         if (this.userID == 0) {
             sendError("You must login first");
             return;
         }
 
-        String otherUsername = json.get("username").getAsString();
-        User otherUser = UserDAO.getUserByUsername(otherUsername);
+        String groupName = json.get("groupName").getAsString();
+        JsonArray membersArray = json.getAsJsonArray("members");
 
-        if (otherUser == null) {
-            sendError("User not found: " + otherUsername);
+        System.out.println("👥 Creating group: " + groupName);
+
+        // Tạo group trong database
+        Integer groupId = GroupDAO.createGroup(groupName, this.userID);
+
+        if (groupId == null) {
+            sendError("Failed to create group");
             return;
         }
 
-        System.out.println("📜 Loading history: " + username + " <-> " + otherUsername);
+        // Thêm creator vào group
+        GroupDAO.addGroupMember(groupId, this.userID);
 
-        // lay 50 tin nhan gan nhat
-        List<Message> messages = MessageDAO.getChatHistory(this.userID, otherUser.getUserID(), 50);
-
-
-        JsonObject response = new JsonObject();
-        response.addProperty("type", "CHAT_HISTORY");
-        response.addProperty("count", messages.size());
-
-        // decrypt messages
-        StringBuilder history = new StringBuilder();
-        for (int i = messages.size() - 1; i >= 0; i--) {
-            Message msg = messages.get(i);
-            String decrypted = SecurityUtil.decryptMessage(msg.getContentEncrypted());
-            String senderName = (msg.getSenderID() == this.userID) ? "You" : otherUsername;
-
-            history.append("[").append(senderName).append("]: ").append(decrypted).append("\n");
+        // Thêm các members
+        for (int i = 0; i < membersArray.size(); i++) {
+            String memberUsername = membersArray.get(i).getAsString();
+            User member = UserDAO.getUserByUsername(memberUsername);
+            if (member != null) {
+                GroupDAO.addGroupMember(groupId, member.getUserID());
+            }
         }
 
-        response.addProperty("history", history.toString());
+        // Thông báo cho creator
+        JsonObject response = new JsonObject();
+        response.addProperty("type", "GROUP_CREATED");
+        response.addProperty("groupId", groupId);
+        response.addProperty("groupName", groupName);
         sendMessage(response.toString());
-        System.out.println("✅ Loaded " + messages.size() + " messages");
+
+        // Thông báo cho các members
+        JsonObject notification = new JsonObject();
+        notification.addProperty("type", "GROUP_CREATED");
+        notification.addProperty("groupId", groupId);
+        notification.addProperty("groupName", groupName);
+        ChatServer.broadcastToGroup(groupId, notification.toString(), this);
+
+        System.out.println("✅ Group created: " + groupName + " (ID: " + groupId + ")");
+    }
+
+    /**
+     * Lấy danh sách groups của user
+     */
+    private void handleGetUserGroups() {
+        if (this.userID == 0) {
+            sendError("You must login first");
+            return;
+        }
+
+        List<Group> groups = GroupDAO.getUserGroups(this.userID);
+
+        JsonObject response = new JsonObject();
+        response.addProperty("type", "USER_GROUPS");
+
+        JsonArray groupsArray = new JsonArray();
+        for (Group group : groups) {
+            JsonObject g = new JsonObject();
+            g.addProperty("groupId", group.getGroupID());
+            g.addProperty("groupName", group.getGroupName());
+            groupsArray.add(g);
+        }
+        response.add("groups", groupsArray);
+
+        sendMessage(response.toString());
+        System.out.println("📋 Sent " + groups.size() + " groups to " + username);
+    }
+
+    /**
+     * Lấy danh sách members của group
+     */
+    private void handleGetGroupMembers(JsonObject json) {
+        if (this.userID == 0) {
+            sendError("You must login first");
+            return;
+        }
+
+        int groupId = json.get("groupId").getAsInt();
+        List<String> members = GroupDAO.getGroupMembers(groupId);
+
+        JsonObject response = new JsonObject();
+        response.addProperty("type", "GROUP_MEMBERS");
+        response.add("members", gson.toJsonTree(members));
+
+        sendMessage(response.toString());
+        System.out.println("👥 Sent " + members.size() + " members of Group#" + groupId);
+    }
+
+    /**
+     * Đổi tên group
+     */
+    private void handleRenameGroup(JsonObject json) {
+        if (this.userID == 0) {
+            sendError("You must login first");
+            return;
+        }
+
+        int groupId = json.get("groupId").getAsInt();
+        String newName = json.get("newName").getAsString();
+
+        boolean success = GroupDAO.updateGroupName(groupId, newName);
+
+        if (success) {
+            JsonObject response = new JsonObject();
+            response.addProperty("type", "GROUP_NAME_UPDATED");
+            response.addProperty("groupId", groupId);
+            response.addProperty("newName", newName);
+
+            // Gửi cho tất cả members
+            ChatServer.broadcastToGroup(groupId, response.toString(), null);
+            System.out.println("✏️ Group#" + groupId + " renamed to: " + newName);
+        } else {
+            sendError("Failed to rename group");
+        }
     }
 
     /**
@@ -347,5 +488,9 @@ public class ClientHandler implements Runnable {
      */
     public String getUsername() {
         return username;
+    }
+
+    public int getUserID() {
+        return userID;
     }
 }

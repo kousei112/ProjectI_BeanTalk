@@ -12,7 +12,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /**
- * Chat Client - Version với UI callbacks
+ * Chat Client - Version với UI callbacks và Group Chat
  */
 public class ChatClient {
     private static final String SERVER_HOST = "localhost";
@@ -23,6 +23,7 @@ public class ChatClient {
     private PrintWriter writer;
     private Gson gson;
     private String username;
+    private int userID;
 
     // Callbacks cho UI
     private BiConsumer<Boolean, String> loginCallback;
@@ -31,6 +32,10 @@ public class ChatClient {
     private Consumer<String> userJoinedCallback;
     private Consumer<String> userLeftCallback;
     private Consumer<List<String>> onlineUsersCallback;
+    private Consumer<GroupData> groupCreatedCallback;
+    private Consumer<List<GroupData>> userGroupsCallback;
+    private Consumer<List<String>> groupMembersCallback;
+    private BiConsumer<Integer, String> groupNameUpdatedCallback;
 
     public ChatClient() {
         this.gson = new Gson();
@@ -73,10 +78,12 @@ public class ChatClient {
             switch (type) {
                 case "LOGIN_SUCCESS":
                     if (loginCallback != null) {
+                        this.userID = json.get("userID").getAsInt();
                         loginCallback.accept(true, "Login successful");
                     }
-                    // Auto request online users
+                    // Auto request online users và groups
                     getOnlineUsers();
+                    getUserGroups();
                     break;
 
                 case "LOGIN_FAILED":
@@ -101,9 +108,54 @@ public class ChatClient {
                     if (newMessageCallback != null) {
                         String sender = json.get("sender").getAsString();
                         String content = json.get("content").getAsString();
-                        String receiver = json.has("receiver") ? json.get("receiver").getAsString() : "ALL";
-                        newMessageCallback.accept(new MessageData(sender, content, receiver));
+                        String receiver = json.has("receiver") ? json.get("receiver").getAsString() : null;
+                        Integer groupId = json.has("groupId") ? json.get("groupId").getAsInt() : null;
+                        newMessageCallback.accept(new MessageData(sender, content, receiver, groupId));
                     }
+                    break;
+
+                case "GROUP_CREATED":
+                    if (groupCreatedCallback != null) {
+                        int groupId = json.get("groupId").getAsInt();
+                        String groupName = json.get("groupName").getAsString();
+                        groupCreatedCallback.accept(new GroupData(groupId, groupName));
+                    }
+                    getUserGroups(); // Refresh groups list
+                    break;
+
+                case "USER_GROUPS":
+                    if (userGroupsCallback != null) {
+                        List<GroupData> groups = new ArrayList<>();
+                        JsonArray array = json.getAsJsonArray("groups");
+                        for (int i = 0; i < array.size(); i++) {
+                            JsonObject g = array.get(i).getAsJsonObject();
+                            groups.add(new GroupData(
+                                    g.get("groupId").getAsInt(),
+                                    g.get("groupName").getAsString()
+                            ));
+                        }
+                        userGroupsCallback.accept(groups);
+                    }
+                    break;
+
+                case "GROUP_MEMBERS":
+                    if (groupMembersCallback != null) {
+                        List<String> members = new ArrayList<>();
+                        JsonArray array = json.getAsJsonArray("members");
+                        for (int i = 0; i < array.size(); i++) {
+                            members.add(array.get(i).getAsString());
+                        }
+                        groupMembersCallback.accept(members);
+                    }
+                    break;
+
+                case "GROUP_NAME_UPDATED":
+                    if (groupNameUpdatedCallback != null) {
+                        int groupId = json.get("groupId").getAsInt();
+                        String newName = json.get("newName").getAsString();
+                        groupNameUpdatedCallback.accept(groupId, newName);
+                    }
+                    getUserGroups(); // Refresh groups list
                     break;
 
                 case "USER_JOINED":
@@ -167,13 +219,64 @@ public class ChatClient {
     }
 
     /**
-     * Gửi tin nhắn
+     * Gửi tin nhắn (private hoặc group)
      */
-    public void sendMessage(String receiver, String content) {
+    public void sendMessage(String receiver, String content, Integer groupId) {
         JsonObject json = new JsonObject();
         json.addProperty("type", "SEND_MESSAGE");
-        json.addProperty("receiver", receiver);
+        if (groupId != null) {
+            json.addProperty("groupId", groupId);
+        } else {
+            json.addProperty("receiver", receiver);
+        }
         json.addProperty("content", content);
+        writer.println(json.toString());
+    }
+
+    /**
+     * Tạo group mới
+     */
+    public void createGroup(String groupName, List<String> members) {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "CREATE_GROUP");
+        json.addProperty("groupName", groupName);
+
+        JsonArray membersArray = new JsonArray();
+        for (String member : members) {
+            membersArray.add(member);
+        }
+        json.add("members", membersArray);
+
+        writer.println(json.toString());
+    }
+
+    /**
+     * Lấy danh sách groups của user
+     */
+    public void getUserGroups() {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "GET_USER_GROUPS");
+        writer.println(json.toString());
+    }
+
+    /**
+     * Lấy danh sách members của group
+     */
+    public void getGroupMembers(int groupId) {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "GET_GROUP_MEMBERS");
+        json.addProperty("groupId", groupId);
+        writer.println(json.toString());
+    }
+
+    /**
+     * Đổi tên group
+     */
+    public void renameGroup(int groupId, String newName) {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "RENAME_GROUP");
+        json.addProperty("groupId", groupId);
+        json.addProperty("newName", newName);
         writer.println(json.toString());
     }
 
@@ -225,12 +328,32 @@ public class ChatClient {
         this.onlineUsersCallback = callback;
     }
 
+    public void setGroupCreatedCallback(Consumer<GroupData> callback) {
+        this.groupCreatedCallback = callback;
+    }
+
+    public void setUserGroupsCallback(Consumer<List<GroupData>> callback) {
+        this.userGroupsCallback = callback;
+    }
+
+    public void setGroupMembersCallback(Consumer<List<String>> callback) {
+        this.groupMembersCallback = callback;
+    }
+
+    public void setGroupNameUpdatedCallback(BiConsumer<Integer, String> callback) {
+        this.groupNameUpdatedCallback = callback;
+    }
+
     public void setUsername(String username) {
         this.username = username;
     }
 
     public String getUsername() {
         return username;
+    }
+
+    public int getUserID() {
+        return userID;
     }
 
     /**
@@ -240,11 +363,26 @@ public class ChatClient {
         public final String sender;
         public final String content;
         public final String receiver;
+        public final Integer groupId;
 
-        public MessageData(String sender, String content, String receiver) {
+        public MessageData(String sender, String content, String receiver, Integer groupId) {
             this.sender = sender;
             this.content = content;
             this.receiver = receiver;
+            this.groupId = groupId;
+        }
+    }
+
+    /**
+     * Data class cho group
+     */
+    public static class GroupData {
+        public final int groupId;
+        public final String groupName;
+
+        public GroupData(int groupId, String groupName) {
+            this.groupId = groupId;
+            this.groupName = groupName;
         }
     }
 }
