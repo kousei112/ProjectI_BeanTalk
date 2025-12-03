@@ -102,6 +102,33 @@ public class UserDAO {
         return null;
     }
 
+    // Lay user bang ID
+    public static User getUserById(int userId) {
+        String sql = "SELECT * FROM Users WHERE user_id = ?";
+
+        try(Connection conn = DatabaseManager.getConnection();
+            PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, userId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return new User(
+                        rs.getInt("user_id"),
+                        rs.getString("username"),
+                        rs.getString("password_hash"),
+                        rs.getString("email"),
+                        rs.getTimestamp("created_at").toLocalDateTime(),
+                        rs.getTimestamp("last_seen") != null ?
+                                rs.getTimestamp("last_seen").toLocalDateTime() : null
+                );
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting user by ID: " + e.getMessage());
+        }
+        return null;
+    }
+
     /**
      * Test DAO
      */

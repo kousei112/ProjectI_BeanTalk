@@ -36,6 +36,8 @@ public class ChatClient {
     private Consumer<List<GroupData>> userGroupsCallback;
     private Consumer<List<String>> groupMembersCallback;
     private BiConsumer<Integer, String> groupNameUpdatedCallback;
+    private Consumer<List<MessageData>> chatHistoryCallback;
+    private Consumer<List<MessageData>> groupHistoryCallback;
 
     public ChatClient() {
         this.gson = new Gson();
@@ -156,6 +158,42 @@ public class ChatClient {
                         groupNameUpdatedCallback.accept(groupId, newName);
                     }
                     getUserGroups(); // Refresh groups list
+                    break;
+
+                case "CHAT_HISTORY":
+                    if (chatHistoryCallback != null) {
+                        List<MessageData> history = new ArrayList<>();
+                        JsonArray array = json.getAsJsonArray("messages");
+                        for (int i = 0; i < array.size(); i++) {
+                            JsonObject msg = array.get(i).getAsJsonObject();
+                            history.add(new MessageData(
+                                    msg.get("sender").getAsString(),
+                                    msg.get("content").getAsString(),
+                                    msg.has("receiver") && !msg.get("receiver").isJsonNull() ?
+                                            msg.get("receiver").getAsString() : null,
+                                    null
+                            ));
+                        }
+                        chatHistoryCallback.accept(history);
+                    }
+                    break;
+
+                case "GROUP_HISTORY":
+                    if (groupHistoryCallback != null) {
+                        List<MessageData> history = new ArrayList<>();
+                        JsonArray array = json.getAsJsonArray("messages");
+                        for (int i = 0; i < array.size(); i++) {
+                            JsonObject msg = array.get(i).getAsJsonObject();
+                            int groupId = msg.get("groupId").getAsInt();
+                            history.add(new MessageData(
+                                    msg.get("sender").getAsString(),
+                                    msg.get("content").getAsString(),
+                                    null,
+                                    groupId
+                            ));
+                        }
+                        groupHistoryCallback.accept(history);
+                    }
                     break;
 
                 case "USER_JOINED":
@@ -281,6 +319,28 @@ public class ChatClient {
     }
 
     /**
+     * Lấy lịch sử chat với user
+     */
+    public void getChatHistory(String otherUsername, int limit) {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "GET_CHAT_HISTORY");
+        json.addProperty("username", otherUsername);
+        json.addProperty("limit", limit);
+        writer.println(json.toString());
+    }
+
+    /**
+     * Lấy lịch sử chat của group
+     */
+    public void getGroupHistory(int groupId, int limit) {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "GET_GROUP_HISTORY");
+        json.addProperty("groupId", groupId);
+        json.addProperty("limit", limit);
+        writer.println(json.toString());
+    }
+
+    /**
      * Lấy danh sách users online
      */
     public void getOnlineUsers() {
@@ -342,6 +402,14 @@ public class ChatClient {
 
     public void setGroupNameUpdatedCallback(BiConsumer<Integer, String> callback) {
         this.groupNameUpdatedCallback = callback;
+    }
+
+    public void setChatHistoryCallback(Consumer<List<MessageData>> callback) {
+        this.chatHistoryCallback = callback;
+    }
+
+    public void setGroupHistoryCallback(Consumer<List<MessageData>> callback) {
+        this.groupHistoryCallback = callback;
     }
 
     public void setUsername(String username) {

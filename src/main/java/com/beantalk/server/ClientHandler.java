@@ -89,6 +89,14 @@ public class ClientHandler implements Runnable {
                     handleRenameGroup(json);
                     break;
 
+                case "GET_CHAT_HISTORY":
+                    handleGetChatHistory(json);
+                    break;
+
+                case "GET_GROUP_HISTORY":
+                    handleGetGroupHistory(json);
+                    break;
+
                 case "GET_ONLINE_USERS":
                     handleGetOnlineUsers();
                     break;
@@ -425,6 +433,112 @@ public class ClientHandler implements Runnable {
         } else {
             sendError("Failed to rename group");
         }
+    }
+
+    /**
+     * Lấy lịch sử chat với user khác
+     */
+    private void handleGetChatHistory(JsonObject json) {
+        if (this.userID == 0) {
+            sendError("You must login first");
+            return;
+        }
+
+        String otherUsername = json.get("username").getAsString();
+        int limit = json.has("limit") ? json.get("limit").getAsInt() : 50;
+
+        User otherUser = UserDAO.getUserByUsername(otherUsername);
+        if (otherUser == null) {
+            sendError("User not found: " + otherUsername);
+            return;
+        }
+
+        System.out.println("📜 Loading chat history: " + username + " <-> " + otherUsername);
+
+        // Lấy tin nhắn từ database
+        List<Message> messages = MessageDAO.getChatHistory(this.userID, otherUser.getUserID(), limit);
+
+        // Tạo response
+        JsonObject response = new JsonObject();
+        response.addProperty("type", "CHAT_HISTORY");
+
+        JsonArray messagesArray = new JsonArray();
+        for (Message msg : messages) {
+            JsonObject msgObj = new JsonObject();
+
+            // Decrypt message
+            String decrypted = SecurityUtil.decryptMessage(msg.getContentEncrypted());
+
+            // Xác định sender
+            String senderName = (msg.getSenderID() == this.userID) ? this.username : otherUsername;
+            String receiverName = (msg.getSenderID() == this.userID) ? otherUsername : this.username;
+
+            msgObj.addProperty("sender", senderName);
+            msgObj.addProperty("content", decrypted);
+            msgObj.addProperty("receiver", receiverName);
+            msgObj.addProperty("timestamp", msg.getSentAt().toString());
+
+            messagesArray.add(msgObj);
+        }
+
+        response.add("messages", messagesArray);
+        sendMessage(response.toString());
+
+        System.out.println("✅ Sent " + messages.size() + " messages to " + username);
+    }
+
+    /**
+     * Lấy lịch sử chat của group
+     */
+    private void handleGetGroupHistory(JsonObject json) {
+        if (this.userID == 0) {
+            sendError("You must login first");
+            return;
+        }
+
+        int groupId = json.get("groupId").getAsInt();
+        int limit = json.has("limit") ? json.get("limit").getAsInt() : 50;
+
+        // Kiểm tra user có phải member không
+        if (!GroupDAO.isMember(groupId, this.userID)) {
+            sendError("You are not a member of this group");
+            return;
+        }
+
+        System.out.println("📜 Loading group history: Group#" + groupId);
+
+        // Lấy tin nhắn từ database
+        List<Message> messages = MessageDAO.getGroupMessages(groupId, limit);
+
+        // Tạo response
+        JsonObject response = new JsonObject();
+        response.addProperty("type", "GROUP_HISTORY");
+
+        JsonArray messagesArray = new JsonArray();
+        for (Message msg : messages) {
+            JsonObject msgObj = new JsonObject();
+
+            // Decrypt message
+            String decrypted = SecurityUtil.decryptMessage(msg.getContentEncrypted());
+
+            // Lấy sender username
+            User sender = UserDAO.getUserByUsername(
+                    UserDAO.getUserById(msg.getSenderID()).getUsername()
+            );
+            String senderName = (sender != null) ? sender.getUsername() : "Unknown";
+
+            msgObj.addProperty("sender", senderName);
+            msgObj.addProperty("content", decrypted);
+            msgObj.addProperty("groupId", groupId);
+            msgObj.addProperty("timestamp", msg.getSentAt().toString());
+
+            messagesArray.add(msgObj);
+        }
+
+        response.add("messages", messagesArray);
+        sendMessage(response.toString());
+
+        System.out.println("✅ Sent " + messages.size() + " group messages to " + username);
     }
 
     /**

@@ -223,4 +223,25 @@ public class GroupDAO {
         }
         return memberIds;
     }
+
+    /**
+     * Lấy group name by ID
+     */
+    public static String getGroupName(int groupId) {
+        String sql = "SELECT group_name FROM Groups WHERE group_id = ?";
+
+        try (Connection conn = DatabaseManager.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, groupId);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return rs.getString("group_name");
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting group name: " + e.getMessage());
+        }
+        return null;
+    }
 }

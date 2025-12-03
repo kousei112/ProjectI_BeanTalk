@@ -629,6 +629,74 @@ public class MainChatFrame extends JFrame {
                 }
             });
         });
+
+        // Chat history callback
+        client.setChatHistoryCallback(history -> {
+            SwingUtilities.invokeLater(() -> {
+                System.out.println("📜 Received chat history: " + history.size() + " messages");
+
+                // Clear chat panel
+                chatPanel.removeAll();
+
+                // Hiển thị từng tin nhắn
+                for (ChatClient.MessageData msg : history) {
+                    String time = ""; // Có thể parse từ timestamp nếu cần
+                    boolean isOwn = msg.sender.equals(username);
+
+                    MessageBubblePanel bubble = new MessageBubblePanel(
+                            msg.sender,
+                            msg.content,
+                            time,
+                            isOwn
+                    );
+
+                    chatPanel.add(bubble);
+                }
+
+                chatPanel.revalidate();
+                chatPanel.repaint();
+
+                // Scroll to bottom
+                SwingUtilities.invokeLater(() -> {
+                    JScrollBar vertical = chatScrollPane.getVerticalScrollBar();
+                    vertical.setValue(vertical.getMaximum());
+                });
+            });
+        });
+
+        // Group history callback
+        client.setGroupHistoryCallback(history -> {
+            SwingUtilities.invokeLater(() -> {
+                System.out.println("📜 Received group history: " + history.size() + " messages");
+
+                // Clear chat panel
+                chatPanel.removeAll();
+
+                // Hiển thị từng tin nhắn
+                for (ChatClient.MessageData msg : history) {
+                    String time = ""; // Có thể parse từ timestamp nếu cần
+                    boolean isOwn = msg.sender.equals(username);
+
+                    MessageBubblePanel bubble = new MessageBubblePanel(
+                            msg.sender,
+                            msg.content,
+                            time,
+                            isOwn
+                    );
+
+                    chatPanel.add(bubble);
+                }
+
+                chatPanel.revalidate();
+                chatPanel.repaint();
+
+                // Scroll to bottom
+                SwingUtilities.invokeLater(() -> {
+                    JScrollBar vertical = chatScrollPane.getVerticalScrollBar();
+                    vertical.setValue(vertical.getMaximum());
+                });
+            });
+        });
     }
 
     /**
@@ -643,11 +711,25 @@ public class MainChatFrame extends JFrame {
         chatPanel.removeAll();
         welcomePanel.setVisible(false);
         chatPanel.setVisible(true);
+
+        // Hiển thị loading message
+        JLabel loadingLabel = new JLabel("Loading chat history...");
+        loadingLabel.setFont(new Font("Arial", Font.ITALIC, 14));
+        loadingLabel.setForeground(Color.GRAY);
+        loadingLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        chatPanel.add(Box.createVerticalGlue());
+        chatPanel.add(loadingLabel);
+        chatPanel.add(Box.createVerticalGlue());
+
         chatPanel.revalidate();
         chatPanel.repaint();
 
         // Ẩn members panel
         membersPanel.setVisible(false);
+
+        // Load chat history
+        client.getChatHistory(user, 50);
+        System.out.println("📜 Requesting chat history with: " + user);
     }
 
     /**
@@ -662,12 +744,26 @@ public class MainChatFrame extends JFrame {
         chatPanel.removeAll();
         welcomePanel.setVisible(false);
         chatPanel.setVisible(true);
+
+        // Hiển thị loading message
+        JLabel loadingLabel = new JLabel("Loading group history...");
+        loadingLabel.setFont(new Font("Arial", Font.ITALIC, 14));
+        loadingLabel.setForeground(Color.GRAY);
+        loadingLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
+        chatPanel.add(Box.createVerticalGlue());
+        chatPanel.add(loadingLabel);
+        chatPanel.add(Box.createVerticalGlue());
+
         chatPanel.revalidate();
         chatPanel.repaint();
 
         // Hiển thị members panel
         membersPanel.setVisible(true);
         client.getGroupMembers(groupId);
+
+        // Load group history
+        client.getGroupHistory(groupId, 50);
+        System.out.println("📜 Requesting group history: Group#" + groupId);
     }
 
     /**

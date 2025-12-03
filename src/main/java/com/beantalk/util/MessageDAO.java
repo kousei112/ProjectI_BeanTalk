@@ -43,9 +43,12 @@ public class MessageDAO {
 
     // lay lich su chat giua 2 users
     public static List<Message> getChatHistory(int user1ID, int user2ID, int limit) {
-        String sql = "SELECT TOP (?) * FROM Messages " +
-                     "WHERE (sender_id = ? AND receiver_id = ? ) OR (sender_id = ? AND receiver_id = ?) " +
-                     "ORDER BY sent_at DESC";
+        String sql = "SELECT * FROM (" +
+                "    SELECT TOP (?) * FROM Messages " +
+                "    WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?) " +
+                "    ORDER BY sent_at DESC" +
+                ") AS RecentMessages " +
+                "ORDER BY sent_at ASC";
         List<Message> messages = new ArrayList<>();
 
         try (Connection conn = DatabaseManager.getConnection();
@@ -79,7 +82,7 @@ public class MessageDAO {
 
     // lay messages cua group
     public static List<Message> getGroupMessages(int groupID, int limit) {
-        String sql = "SELECT TOP (?) * FROM Messages WHERE group_id = ? ORDER BY sent_at DESC";
+        String sql = "SELECT TOP (?) * FROM Messages WHERE group_id = ? ORDER BY sent_at ASC";
 
         List<Message> messages = new ArrayList<>();
 
