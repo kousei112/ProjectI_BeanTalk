@@ -332,6 +332,16 @@ public class MainChatFrame extends JFrame {
         ));
         messageField.addActionListener(e -> sendMessage());
 
+        // Attach file button
+        JButton attachButton = new JButton("📎");
+        attachButton.setFont(com.beantalk.util.EmojiFontUtil.getEmojiFont(Font.PLAIN, 20));
+        attachButton.setBackground(Color.WHITE);
+        attachButton.setFocusPainted(false);
+        attachButton.setBorder(new EmptyBorder(10, 15, 10, 15));
+        attachButton.setCursor(new Cursor(Cursor.HAND_CURSOR));
+        attachButton.setToolTipText("Attach File");
+        attachButton.addActionListener(e -> handleAttachFile());
+
         // Emoji button
         JButton emojiButton = new JButton("😊");
         emojiButton.setFont(com.beantalk.util.EmojiFontUtil.getEmojiFont(Font.PLAIN, 20));
@@ -356,6 +366,7 @@ public class MainChatFrame extends JFrame {
 
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
         buttonPanel.setBackground(Color.WHITE);
+        buttonPanel.add(attachButton);
         buttonPanel.add(emojiButton);
         buttonPanel.add(sendButton);
 
@@ -511,14 +522,29 @@ public class MainChatFrame extends JFrame {
                     String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"));
                     boolean isOwn = msg.sender.equals(username);
 
-                    MessageBubblePanel bubble = new MessageBubblePanel(
-                            msg.sender,
-                            msg.content,
-                            time,
-                            isOwn
-                    );
+                    // Kiểm tra loại message
+                    if (msg.messageType != null && !msg.messageType.equals("TEXT")) {
+                        // FILE hoặc IMAGE message
+                        FileBubblePanel bubble = new FileBubblePanel(
+                                msg.sender,
+                                msg.fileName,
+                                msg.filePath,
+                                msg.messageType,
+                                time,
+                                isOwn
+                        );
+                        chatPanel.add(bubble);
+                    } else {
+                        // TEXT message
+                        MessageBubblePanel bubble = new MessageBubblePanel(
+                                msg.sender,
+                                msg.content,
+                                time,
+                                isOwn
+                        );
+                        chatPanel.add(bubble);
+                    }
 
-                    chatPanel.add(bubble);
                     chatPanel.revalidate();
                     chatPanel.repaint();
 
@@ -817,6 +843,120 @@ public class MainChatFrame extends JFrame {
 
             client.getGroupMembers(group.groupId);
         }
+    }
+
+    /**
+     * Xử lý attach file
+     */
+    private void handleAttachFile() {
+        if (currentGroupId == null && currentReceiver == null) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Please select a user or group to send file!",
+                    "No Chat Selected",
+                    JOptionPane.WARNING_MESSAGE
+            );
+            return;
+        }
+
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Select File to Send");
+
+        int result = fileChooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            java.io.File selectedFile = fileChooser.getSelectedFile();
+
+            try {
+                // Validate file
+                com.beantalk.util.FileTransferUtil.validateFile(selectedFile);
+
+                // Confirm
+                String fileSize = com.beantalk.util.FileTransferUtil.formatFileSize(selectedFile.length());
+                int confirm = JOptionPane.showConfirmDialog(
+                        this,
+                        "Send file: " + selectedFile.getName() + " (" + fileSize + ")?",
+                        "Confirm Send File",
+                        JOptionPane.YES_NO_OPTION
+                );
+
+                if (confirm == JOptionPane.YES_OPTION) {
+                    sendFile(selectedFile);
+                }
+
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(
+                        this,
+                        "Error: " + e.getMessage(),
+                        "File Error",
+                        JOptionPane.ERROR_MESSAGE
+                );
+            }
+        }
+    }
+
+    /**
+     * Gửi file
+     */
+    private void sendFile(java.io.File file) {
+        // Show progress dialog
+        JDialog progressDialog = new JDialog(this, "Sending File", true);
+        progressDialog.setLayout(new BorderLayout(10, 10));
+        progressDialog.setSize(300, 100);
+        progressDialog.setLocationRelativeTo(this);
+
+        JLabel statusLabel = new JLabel("Preparing file...", SwingConstants.CENTER);
+        statusLabel.setBorder(new EmptyBorder(20, 20, 20, 20));
+        progressDialog.add(statusLabel, BorderLayout.CENTER);
+
+        // Send in background thread
+        SwingWorker<Void, Void> worker = new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                try {
+                    // Convert to Base64
+                    String fileBase64 = com.beantalk.util.FileTransferUtil.fileToBase64(file);
+
+                    // Determine message type
+                    String messageType = com.beantalk.util.FileTransferUtil.isImageFile(file.getName())
+                            ? "IMAGE" : "FILE";
+
+                    // Send
+                    client.sendFile(currentReceiver, currentGroupId, file.getName(),
+                            fileBase64, messageType);
+
+                } catch (Exception e) {
+                    throw e;
+                }
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                progressDialog.dispose();
+                try {
+                    get(); // Check for exceptions
+                    // Success - file bubble will appear via callback
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(
+                            MainChatFrame.this,
+                            "Failed to send file: " + e.getMessage(),
+                            "Send Error",
+                            JOptionPane.ERROR_MESSAGE
+                    );
+                }
+            }
+        };
+
+        worker.execute();
+
+        // Show progress dialog (will be closed when done)
+        Timer timer = new Timer(100, e -> {
+            if (!worker.isDone()) {
+                progressDialog.setVisible(true);
+            }
+        });
+        timer.setRepeats(false);
+        timer.start();
     }
 
     /**

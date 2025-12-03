@@ -73,6 +73,10 @@ public class ClientHandler implements Runnable {
                     handleSendMessage(json);
                     break;
 
+                case "SEND_FILE":
+                    handleSendFile(json);
+                    break;
+
                 case "CREATE_GROUP":
                     handleCreateGroup(json);
                     break;
@@ -306,6 +310,138 @@ public class ClientHandler implements Runnable {
         } else {
             System.out.println("❌ User offline: " + receiver);
             // Vẫn đã lưu vào DB, khi user online sẽ load history
+        }
+    }
+
+    /**
+     * Xử lý gửi file
+     */
+    private void handleSendFile(JsonObject json) {
+        if (this.userID == 0) {
+            sendError("You must login first");
+            return;
+        }
+
+        String fileName = json.get("fileName").getAsString();
+        String fileBase64 = json.get("fileData").getAsString();
+        String messageType = json.get("messageType").getAsString();
+        Integer groupId = json.has("groupId") ? json.get("groupId").getAsInt() : null;
+        String receiver = json.has("receiver") ? json.get("receiver").getAsString() : null;
+
+        System.out.println("📎 Receiving file: " + fileName + " (" + messageType + ")");
+
+        try {
+            // Lưu file vào server
+            String filePath = com.beantalk.util.FileTransferUtil.base64ToFile(fileBase64, fileName);
+            System.out.println("💾 File saved: " + filePath);
+
+            // Encrypt file path (hoặc có thể không encrypt)
+            String encryptedPath = SecurityUtil.encryptMessage(filePath);
+
+            if (groupId != null) {
+                // GROUP FILE
+                handleGroupFile(groupId, fileName, filePath, encryptedPath, messageType);
+            } else if (receiver != null) {
+                // PRIVATE FILE
+                handlePrivateFile(receiver, fileName, filePath, encryptedPath, messageType);
+            }
+
+        } catch (Exception e) {
+            sendError("Failed to save file: " + e.getMessage());
+            System.err.println("❌ Error saving file: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Xử lý group file
+     */
+    private void handleGroupFile(int groupId, String fileName, String filePath,
+                                 String encryptedPath, String messageType) {
+        // Kiểm tra user có phải member không
+        if (!GroupDAO.isMember(groupId, this.userID)) {
+            sendError("You are not a member of this group");
+            return;
+        }
+
+        // Lưu vào database
+        boolean saved = MessageDAO.saveMessage(
+                this.userID,
+                null,
+                groupId,
+                encryptedPath,
+                messageType,
+                filePath
+        );
+
+        if (saved) {
+            System.out.println("💾 File message saved to DB");
+        }
+
+        // Tạo notification message
+        JsonObject message = new JsonObject();
+        message.addProperty("type", "NEW_MESSAGE");
+        message.addProperty("sender", this.username);
+        message.addProperty("groupId", groupId);
+        message.addProperty("messageType", messageType);
+        message.addProperty("fileName", fileName);
+        message.addProperty("filePath", filePath);
+        message.addProperty("content", "[File: " + fileName + "]");
+
+        // Gửi cho sender
+        sendMessage(message.toString());
+
+        // Broadcast đến group
+        ChatServer.broadcastToGroup(groupId, message.toString(), this);
+        System.out.println("📤 File broadcasted to group#" + groupId);
+    }
+
+    /**
+     * Xử lý private file
+     */
+    private void handlePrivateFile(String receiver, String fileName, String filePath,
+                                   String encryptedPath, String messageType) {
+        // Tìm receiver
+        User receiverUser = UserDAO.getUserByUsername(receiver);
+
+        if (receiverUser == null) {
+            sendError("User not found: " + receiver);
+            return;
+        }
+
+        // Lưu vào database
+        boolean saved = MessageDAO.saveMessage(
+                this.userID,
+                receiverUser.getUserID(),
+                null,
+                encryptedPath,
+                messageType,
+                filePath
+        );
+
+        if (saved) {
+            System.out.println("💾 File message saved to DB");
+        }
+
+        // Tạo message
+        JsonObject message = new JsonObject();
+        message.addProperty("type", "NEW_MESSAGE");
+        message.addProperty("sender", this.username);
+        message.addProperty("receiver", receiver);
+        message.addProperty("messageType", messageType);
+        message.addProperty("fileName", fileName);
+        message.addProperty("filePath", filePath);
+        message.addProperty("content", "[File: " + fileName + "]");
+
+        // Gửi lại cho sender
+        sendMessage(message.toString());
+
+        // Gửi cho receiver
+        boolean sent = ChatServer.sendToUser(receiver, message.toString());
+        if (sent) {
+            System.out.println("📤 File sent to: " + receiver);
+        } else {
+            System.out.println("❌ User offline: " + receiver);
         }
     }
 

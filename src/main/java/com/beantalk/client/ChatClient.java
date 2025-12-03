@@ -36,6 +36,7 @@ public class ChatClient {
     private Consumer<List<GroupData>> userGroupsCallback;
     private Consumer<List<String>> groupMembersCallback;
     private BiConsumer<Integer, String> groupNameUpdatedCallback;
+
     private Consumer<List<MessageData>> chatHistoryCallback;
     private Consumer<List<MessageData>> groupHistoryCallback;
 
@@ -112,7 +113,12 @@ public class ChatClient {
                         String content = json.get("content").getAsString();
                         String receiver = json.has("receiver") ? json.get("receiver").getAsString() : null;
                         Integer groupId = json.has("groupId") ? json.get("groupId").getAsInt() : null;
-                        newMessageCallback.accept(new MessageData(sender, content, receiver, groupId));
+                        String messageType = json.has("messageType") ? json.get("messageType").getAsString() : "TEXT";
+                        String fileName = json.has("fileName") ? json.get("fileName").getAsString() : null;
+                        String filePath = json.has("filePath") ? json.get("filePath").getAsString() : null;
+
+                        newMessageCallback.accept(new MessageData(sender, content, receiver, groupId,
+                                messageType, fileName, filePath));
                     }
                     break;
 
@@ -268,6 +274,24 @@ public class ChatClient {
             json.addProperty("receiver", receiver);
         }
         json.addProperty("content", content);
+        writer.println(json.toString());
+    }
+
+    /**
+     * Gửi file (private hoặc group)
+     */
+    public void sendFile(String receiver, Integer groupId, String fileName,
+                         String fileBase64, String messageType) {
+        JsonObject json = new JsonObject();
+        json.addProperty("type", "SEND_FILE");
+        if (groupId != null) {
+            json.addProperty("groupId", groupId);
+        } else {
+            json.addProperty("receiver", receiver);
+        }
+        json.addProperty("fileName", fileName);
+        json.addProperty("fileData", fileBase64);
+        json.addProperty("messageType", messageType);
         writer.println(json.toString());
     }
 
@@ -432,12 +456,23 @@ public class ChatClient {
         public final String content;
         public final String receiver;
         public final Integer groupId;
+        public final String messageType;
+        public final String fileName;
+        public final String filePath;
 
         public MessageData(String sender, String content, String receiver, Integer groupId) {
+            this(sender, content, receiver, groupId, "TEXT", null, null);
+        }
+
+        public MessageData(String sender, String content, String receiver, Integer groupId,
+                           String messageType, String fileName, String filePath) {
             this.sender = sender;
             this.content = content;
             this.receiver = receiver;
             this.groupId = groupId;
+            this.messageType = messageType != null ? messageType : "TEXT";
+            this.fileName = fileName;
+            this.filePath = filePath;
         }
     }
 
