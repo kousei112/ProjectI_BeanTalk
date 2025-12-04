@@ -602,17 +602,27 @@ public class ClientHandler implements Runnable {
         for (Message msg : messages) {
             JsonObject msgObj = new JsonObject();
 
-            // Decrypt message
-            String decrypted = SecurityUtil.decryptMessage(msg.getContentEncrypted());
-
             // Xác định sender
             String senderName = (msg.getSenderID() == this.userID) ? this.username : otherUsername;
             String receiverName = (msg.getSenderID() == this.userID) ? otherUsername : this.username;
 
             msgObj.addProperty("sender", senderName);
-            msgObj.addProperty("content", decrypted);
             msgObj.addProperty("receiver", receiverName);
+            msgObj.addProperty("messageType", msg.getMessageType());
             msgObj.addProperty("timestamp", msg.getSentAt().toString());
+
+            // Xử lý theo loại message
+            if (msg.getMessageType().equals("TEXT")) {
+                // TEXT message - decrypt content
+                String decrypted = SecurityUtil.decryptMessage(msg.getContentEncrypted());
+                msgObj.addProperty("content", decrypted);
+            } else {
+                // FILE hoặc IMAGE message
+                String filePath = msg.getFilePath();
+                msgObj.addProperty("filePath", filePath);
+                msgObj.addProperty("fileName", com.beantalk.util.FileTransferUtil.getFileName(filePath));
+                msgObj.addProperty("content", "[File: " + com.beantalk.util.FileTransferUtil.getFileName(filePath) + "]");
+            }
 
             messagesArray.add(msgObj);
         }
@@ -654,19 +664,27 @@ public class ClientHandler implements Runnable {
         for (Message msg : messages) {
             JsonObject msgObj = new JsonObject();
 
-            // Decrypt message
-            String decrypted = SecurityUtil.decryptMessage(msg.getContentEncrypted());
-
             // Lấy sender username
-            User sender = UserDAO.getUserByUsername(
-                    UserDAO.getUserById(msg.getSenderID()).getUsername()
-            );
+            User sender = UserDAO.getUserById(msg.getSenderID());
             String senderName = (sender != null) ? sender.getUsername() : "Unknown";
 
             msgObj.addProperty("sender", senderName);
-            msgObj.addProperty("content", decrypted);
             msgObj.addProperty("groupId", groupId);
+            msgObj.addProperty("messageType", msg.getMessageType());
             msgObj.addProperty("timestamp", msg.getSentAt().toString());
+
+            // Xử lý theo loại message
+            if (msg.getMessageType().equals("TEXT")) {
+                // TEXT message - decrypt content
+                String decrypted = SecurityUtil.decryptMessage(msg.getContentEncrypted());
+                msgObj.addProperty("content", decrypted);
+            } else {
+                // FILE hoặc IMAGE message
+                String filePath = msg.getFilePath();
+                msgObj.addProperty("filePath", filePath);
+                msgObj.addProperty("fileName", com.beantalk.util.FileTransferUtil.getFileName(filePath));
+                msgObj.addProperty("content", "[File: " + com.beantalk.util.FileTransferUtil.getFileName(filePath) + "]");
+            }
 
             messagesArray.add(msgObj);
         }

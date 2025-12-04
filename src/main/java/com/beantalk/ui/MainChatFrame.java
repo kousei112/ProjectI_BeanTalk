@@ -669,14 +669,28 @@ public class MainChatFrame extends JFrame {
                     String time = ""; // Có thể parse từ timestamp nếu cần
                     boolean isOwn = msg.sender.equals(username);
 
-                    MessageBubblePanel bubble = new MessageBubblePanel(
-                            msg.sender,
-                            msg.content,
-                            time,
-                            isOwn
-                    );
-
-                    chatPanel.add(bubble);
+                    // Kiểm tra loại message
+                    if (msg.messageType != null && !msg.messageType.equals("TEXT")) {
+                        // FILE hoặc IMAGE message
+                        FileBubblePanel bubble = new FileBubblePanel(
+                                msg.sender,
+                                msg.fileName,
+                                msg.filePath,
+                                msg.messageType,
+                                time,
+                                isOwn
+                        );
+                        chatPanel.add(bubble);
+                    } else {
+                        // TEXT message
+                        MessageBubblePanel bubble = new MessageBubblePanel(
+                                msg.sender,
+                                msg.content,
+                                time,
+                                isOwn
+                        );
+                        chatPanel.add(bubble);
+                    }
                 }
 
                 chatPanel.revalidate();
@@ -703,14 +717,28 @@ public class MainChatFrame extends JFrame {
                     String time = ""; // Có thể parse từ timestamp nếu cần
                     boolean isOwn = msg.sender.equals(username);
 
-                    MessageBubblePanel bubble = new MessageBubblePanel(
-                            msg.sender,
-                            msg.content,
-                            time,
-                            isOwn
-                    );
-
-                    chatPanel.add(bubble);
+                    // Kiểm tra loại message
+                    if (msg.messageType != null && !msg.messageType.equals("TEXT")) {
+                        // FILE hoặc IMAGE message
+                        FileBubblePanel bubble = new FileBubblePanel(
+                                msg.sender,
+                                msg.fileName,
+                                msg.filePath,
+                                msg.messageType,
+                                time,
+                                isOwn
+                        );
+                        chatPanel.add(bubble);
+                    } else {
+                        // TEXT message
+                        MessageBubblePanel bubble = new MessageBubblePanel(
+                                msg.sender,
+                                msg.content,
+                                time,
+                                isOwn
+                        );
+                        chatPanel.add(bubble);
+                    }
                 }
 
                 chatPanel.revalidate();

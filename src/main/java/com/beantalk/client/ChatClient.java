@@ -172,12 +172,20 @@ public class ChatClient {
                         JsonArray array = json.getAsJsonArray("messages");
                         for (int i = 0; i < array.size(); i++) {
                             JsonObject msg = array.get(i).getAsJsonObject();
+
+                            String messageType = msg.has("messageType") ? msg.get("messageType").getAsString() : "TEXT";
+                            String fileName = msg.has("fileName") ? msg.get("fileName").getAsString() : null;
+                            String filePath = msg.has("filePath") ? msg.get("filePath").getAsString() : null;
+
                             history.add(new MessageData(
                                     msg.get("sender").getAsString(),
                                     msg.get("content").getAsString(),
                                     msg.has("receiver") && !msg.get("receiver").isJsonNull() ?
                                             msg.get("receiver").getAsString() : null,
-                                    null
+                                    null,
+                                    messageType,
+                                    fileName,
+                                    filePath
                             ));
                         }
                         chatHistoryCallback.accept(history);
@@ -191,11 +199,19 @@ public class ChatClient {
                         for (int i = 0; i < array.size(); i++) {
                             JsonObject msg = array.get(i).getAsJsonObject();
                             int groupId = msg.get("groupId").getAsInt();
+
+                            String messageType = msg.has("messageType") ? msg.get("messageType").getAsString() : "TEXT";
+                            String fileName = msg.has("fileName") ? msg.get("fileName").getAsString() : null;
+                            String filePath = msg.has("filePath") ? msg.get("filePath").getAsString() : null;
+
                             history.add(new MessageData(
                                     msg.get("sender").getAsString(),
                                     msg.get("content").getAsString(),
                                     null,
-                                    groupId
+                                    groupId,
+                                    messageType,
+                                    fileName,
+                                    filePath
                             ));
                         }
                         groupHistoryCallback.accept(history);
