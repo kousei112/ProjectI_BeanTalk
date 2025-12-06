@@ -258,7 +258,7 @@ public class MainChatFrame extends JFrame {
         welcomePanel = createWelcomePanel();
 
         // Chat panel
-        chatPanel = createBackgroundPanel("/images/chatwallpaper.jpg");
+        chatPanel = createBackgroundPanel("/images/b.jpg");
         chatPanel.setLayout(new BoxLayout(chatPanel, BoxLayout.Y_AXIS));
         chatPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
         chatPanel.setVisible(false);
